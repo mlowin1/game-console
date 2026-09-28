@@ -20,4 +20,22 @@ contextBridge.exposeInMainWorld('launcher', {
       'games:runtime-status',
       gameId
     ),
+
+    onControllerCommand: (callback) => {
+      const listener = (_event, command) => {
+        callback(command)
+      }
+
+      ipcRenderer.on(
+        'controller:command',
+        listener
+      )
+
+      return () => {
+        ipcRenderer.removeListener(
+          'controller:command',
+          listener
+        )
+      }
+    },
 })

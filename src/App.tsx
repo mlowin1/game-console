@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
+type Direction =
+  | 'up'
+  | 'down'
+  | 'left'
+  | 'right'
+
 function App() {
   const [games, setGames] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] =
@@ -15,8 +21,33 @@ function App() {
   const gameCardRefs =
     useRef<(HTMLButtonElement | null)[]>([])
 
+  const playButtonRef =
+    useRef<HTMLButtonElement | null>(null)
+
   /*
-   * Load the game library when the app starts.
+   * Remember which game was most recently focused.
+   */
+  const lastFocusedGameIndex = useRef(0)
+
+  /*
+   * Keep current values available to the controller
+   * event handler without constantly recreating the
+   * IPC subscription.
+   */
+  const gamesRef = useRef<Game[]>([])
+  const selectedGameRef =
+    useRef<GameDetails | null>(null)
+
+  useEffect(() => {
+    gamesRef.current = games
+  }, [games])
+
+  useEffect(() => {
+    selectedGameRef.current = selectedGame
+  }, [selectedGame])
+
+  /*
+   * Load the game library.
    */
   useEffect(() => {
     window.launcher
@@ -31,20 +62,38 @@ function App() {
   }, [])
 
   /*
-   * Automatically focus the first game whenever
-   * we are on the library screen.
+   * Restore focus when returning to the library.
    */
   useEffect(() => {
     if (!selectedGame && games.length > 0) {
       requestAnimationFrame(() => {
-        gameCardRefs.current[0]?.focus()
+        const index = Math.min(
+          lastFocusedGameIndex.current,
+          games.length - 1
+        )
+
+        gameCardRefs.current[index]?.focus()
       })
     }
   }, [games, selectedGame])
 
   /*
-   * Monitor the currently selected game's runtime
-   * state while its details page is open.
+   * When game details open, focus the Play button.
+   *
+   * This means Cross can immediately activate it.
+   */
+  useEffect(() => {
+    if (!selectedGame) {
+      return
+    }
+
+    requestAnimationFrame(() => {
+      playButtonRef.current?.focus()
+    })
+  }, [selectedGame])
+
+  /*
+   * Monitor the selected game's runtime status.
    */
   useEffect(() => {
     if (!selectedGame) {
@@ -86,11 +135,7 @@ function App() {
   }, [selectedGame])
 
   /*
-   * Escape or Backspace returns from the
-   * game-details screen to the library.
-   *
-   * Later, the controller's Circle/B button
-   * will trigger this same behavior.
+   * Keyboard Back behavior.
    */
   useEffect(() => {
     if (!selectedGame) {
@@ -121,137 +166,89 @@ function App() {
   }, [selectedGame])
 
   /*
-   * Keyboard navigation for the game library.
-   *
-   * Left/right move between adjacent games.
-   *
-   * Up/down inspect the actual rendered
-   * positions of the cards so navigation
-   * continues to work if the number of
-   * columns changes with screen size.
+   * Find the game card currently focused.
    */
-  function handleGameKeyDown(
-    event: React.KeyboardEvent<HTMLButtonElement>,
+  function getFocusedGameIndex() {
+    const focusedElement =
+      document.activeElement
+
+    const index =
+      gameCardRefs.current.findIndex(
+        (card) =>
+          card === focusedElement
+      )
+
+    if (index !== -1) {
+      return index
+    }
+
+    return Math.min(
+      lastFocusedGameIndex.current,
+      Math.max(
+        gamesRef.current.length - 1,
+        0
+      )
+    )
+  }
+
+  /*
+   * Shared navigation engine.
+   *
+   * Both keyboard and controller navigation
+   * ultimately use this function.
+   */
+  function moveGameFocus(
+    direction: Direction,
     index: number
   ) {
     const currentCard =
       gameCardRefs.current[index]
 
-    if (!currentCard) {
+    const currentGames =
+      gamesRef.current
+
+    if (
+      !currentCard ||
+      currentGames.length === 0
+    ) {
       return
     }
 
     let nextIndex = index
 
-    switch (event.key) {
-      case 'ArrowRight':
-        nextIndex = Math.min(
-          index + 1,
-          games.length - 1
+    if (direction === 'right') {
+      nextIndex = Math.min(
+        index + 1,
+        currentGames.length - 1
+      )
+    }
+
+    if (direction === 'left') {
+      nextIndex = Math.max(
+        index - 1,
+        0
+      )
+    }
+
+    if (direction === 'down') {
+      const currentTop =
+        currentCard.offsetTop
+
+      const nextRowIndex =
+        gameCardRefs.current.findIndex(
+          (card, cardIndex) =>
+            cardIndex > index &&
+            card !== null &&
+            card.offsetTop > currentTop
         )
-        break
 
-      case 'ArrowLeft':
-        nextIndex = Math.max(
-          index - 1,
-          0
-        )
-        break
+      if (nextRowIndex !== -1) {
+        const nextRowTop =
+          gameCardRefs.current[
+            nextRowIndex
+          ]?.offsetTop
 
-      case 'ArrowDown': {
-        const currentTop =
-          currentCard.offsetTop
-
-        /*
-         * Find the first card physically
-         * positioned on a lower row.
-         */
-        const nextRowIndex =
-          gameCardRefs.current.findIndex(
-            (card, cardIndex) =>
-              cardIndex > index &&
-              card !== null &&
-              card.offsetTop > currentTop
-          )
-
-        if (nextRowIndex !== -1) {
-          const nextRowTop =
-            gameCardRefs.current[
-              nextRowIndex
-            ]?.offsetTop
-
-          /*
-           * Get every card on that row.
-           */
-          const candidates =
-            gameCardRefs.current
-              .map((card, cardIndex) => ({
-                card,
-                cardIndex,
-              }))
-              .filter(
-                ({ card }) =>
-                  card !== null &&
-                  card.offsetTop ===
-                    nextRowTop
-              )
-
-          const currentCenter =
-            currentCard.offsetLeft +
-            currentCard.offsetWidth / 2
-
-          let closest = candidates[0]
-
-          /*
-           * Pick the card whose horizontal
-           * center is closest to the current
-           * card.
-           */
-          for (const candidate of candidates) {
-            if (
-              !candidate.card ||
-              !closest.card
-            ) {
-              continue
-            }
-
-            const candidateCenter =
-              candidate.card.offsetLeft +
-              candidate.card.offsetWidth / 2
-
-            const closestCenter =
-              closest.card.offsetLeft +
-              closest.card.offsetWidth / 2
-
-            if (
-              Math.abs(
-                candidateCenter -
-                  currentCenter
-              ) <
-              Math.abs(
-                closestCenter -
-                  currentCenter
-              )
-            ) {
-              closest = candidate
-            }
-          }
-
-          nextIndex = closest.cardIndex
-        }
-
-        break
-      }
-
-      case 'ArrowUp': {
-        const currentTop =
-          currentCard.offsetTop
-
-        /*
-         * Find all cards above the
-         * current card.
-         */
-        const previousCards =
+        const candidates =
           gameCardRefs.current
             .map((card, cardIndex) => ({
               card,
@@ -260,80 +257,133 @@ function App() {
             .filter(
               ({ card }) =>
                 card !== null &&
-                card.offsetTop <
-                  currentTop
+                card.offsetTop ===
+                  nextRowTop
             )
 
-        if (previousCards.length > 0) {
-          /*
-           * Find the row immediately above.
-           */
-          const previousRowTop =
-            Math.max(
-              ...previousCards.map(
-                ({ card }) =>
-                  card!.offsetTop
-              )
-            )
+        const currentCenter =
+          currentCard.offsetLeft +
+          currentCard.offsetWidth / 2
 
-          const candidates =
-            previousCards.filter(
-              ({ card }) =>
-                card!.offsetTop ===
-                previousRowTop
-            )
+        let closest =
+          candidates[0]
 
-          const currentCenter =
-            currentCard.offsetLeft +
-            currentCard.offsetWidth / 2
-
-          let closest = candidates[0]
-
-          /*
-           * Choose the card most closely
-           * aligned horizontally.
-           */
-          for (const candidate of candidates) {
-            if (
-              !candidate.card ||
-              !closest.card
-            ) {
-              continue
-            }
-
-            const candidateCenter =
-              candidate.card.offsetLeft +
-              candidate.card.offsetWidth / 2
-
-            const closestCenter =
-              closest.card.offsetLeft +
-              closest.card.offsetWidth / 2
-
-            if (
-              Math.abs(
-                candidateCenter -
-                  currentCenter
-              ) <
-              Math.abs(
-                closestCenter -
-                  currentCenter
-              )
-            ) {
-              closest = candidate
-            }
+        for (const candidate of candidates) {
+          if (
+            !candidate?.card ||
+            !closest?.card
+          ) {
+            continue
           }
 
-          nextIndex = closest.cardIndex
+          const candidateCenter =
+            candidate.card.offsetLeft +
+            candidate.card.offsetWidth / 2
+
+          const closestCenter =
+            closest.card.offsetLeft +
+            closest.card.offsetWidth / 2
+
+          if (
+            Math.abs(
+              candidateCenter -
+                currentCenter
+            ) <
+            Math.abs(
+              closestCenter -
+                currentCenter
+            )
+          ) {
+            closest = candidate
+          }
         }
 
-        break
+        if (closest) {
+          nextIndex =
+            closest.cardIndex
+        }
       }
-
-      default:
-        return
     }
 
-    event.preventDefault()
+    if (direction === 'up') {
+      const currentTop =
+        currentCard.offsetTop
+
+      const previousCards =
+        gameCardRefs.current
+          .map((card, cardIndex) => ({
+            card,
+            cardIndex,
+          }))
+          .filter(
+            ({ card }) =>
+              card !== null &&
+              card.offsetTop <
+                currentTop
+          )
+
+      if (previousCards.length > 0) {
+        const previousRowTop =
+          Math.max(
+            ...previousCards.map(
+              ({ card }) =>
+                card!.offsetTop
+            )
+          )
+
+        const candidates =
+          previousCards.filter(
+            ({ card }) =>
+              card!.offsetTop ===
+                previousRowTop
+          )
+
+        const currentCenter =
+          currentCard.offsetLeft +
+          currentCard.offsetWidth / 2
+
+        let closest =
+          candidates[0]
+
+        for (const candidate of candidates) {
+          if (
+            !candidate?.card ||
+            !closest?.card
+          ) {
+            continue
+          }
+
+          const candidateCenter =
+            candidate.card.offsetLeft +
+            candidate.card.offsetWidth / 2
+
+          const closestCenter =
+            closest.card.offsetLeft +
+            closest.card.offsetWidth / 2
+
+          if (
+            Math.abs(
+              candidateCenter -
+                currentCenter
+            ) <
+            Math.abs(
+              closestCenter -
+                currentCenter
+            )
+          ) {
+            closest = candidate
+          }
+        }
+
+        if (closest) {
+          nextIndex =
+            closest.cardIndex
+        }
+      }
+    }
+
+    lastFocusedGameIndex.current =
+      nextIndex
 
     gameCardRefs.current[
       nextIndex
@@ -341,7 +391,115 @@ function App() {
   }
 
   /*
-   * Open a game's details page.
+   * Keyboard navigation.
+   */
+  function handleGameKeyDown(
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number
+  ) {
+    let direction:
+      | Direction
+      | null = null
+
+    switch (event.key) {
+      case 'ArrowRight':
+        direction = 'right'
+        break
+
+      case 'ArrowLeft':
+        direction = 'left'
+        break
+
+      case 'ArrowDown':
+        direction = 'down'
+        break
+
+      case 'ArrowUp':
+        direction = 'up'
+        break
+
+      default:
+        return
+    }
+
+    event.preventDefault()
+
+    moveGameFocus(
+      direction,
+      index
+    )
+  }
+
+  /*
+   * Receive normalized controller commands
+   * from Electron.
+   */
+  useEffect(() => {
+    const unsubscribe =
+      window.launcher.onControllerCommand(
+        (command) => {
+          console.log(
+            'React controller command:',
+            command
+          )
+
+          const currentSelectedGame =
+            selectedGameRef.current
+
+          /*
+           * GAME DETAILS
+           */
+          if (currentSelectedGame) {
+            if (command === 'back') {
+              setSelectedGame(null)
+              return
+            }
+
+            if (command === 'select') {
+              playButtonRef.current?.click()
+              return
+            }
+
+            return
+          }
+
+          /*
+           * LIBRARY
+           */
+          if (
+            command === 'up' ||
+            command === 'down' ||
+            command === 'left' ||
+            command === 'right'
+          ) {
+            const index =
+              getFocusedGameIndex()
+
+            moveGameFocus(
+              command,
+              index
+            )
+
+            return
+          }
+
+          if (command === 'select') {
+            const index =
+              getFocusedGameIndex()
+
+            const card =
+              gameCardRefs.current[index]
+
+            card?.click()
+          }
+        }
+      )
+
+    return unsubscribe
+  }, [])
+
+  /*
+   * Open game details.
    */
   async function openGame(gameId: number) {
     try {
@@ -366,7 +524,7 @@ function App() {
   }
 
   /*
-   * Launch the selected game.
+   * Launch selected game.
    */
   async function handlePlay(gameId: number) {
     try {
@@ -396,7 +554,7 @@ function App() {
   }
 
   /*
-   * Game details screen.
+   * GAME DETAILS
    */
   if (selectedGame) {
     const installedSource =
@@ -417,7 +575,9 @@ function App() {
           ← Back
         </button>
 
-        <h1>{selectedGame.title}</h1>
+        <h1>
+          {selectedGame.title}
+        </h1>
 
         <p className="description">
           {selectedGame.description}
@@ -448,15 +608,19 @@ function App() {
         </div>
 
         <button
+          ref={playButtonRef}
           className="play-button"
           disabled={
             !installedSource ||
             runtimeStatus ===
               'launching' ||
-            runtimeStatus === 'running'
+            runtimeStatus ===
+              'running'
           }
           onClick={() =>
-            handlePlay(selectedGame.id)
+            handlePlay(
+              selectedGame.id
+            )
           }
         >
           {!installedSource
@@ -474,7 +638,7 @@ function App() {
   }
 
   /*
-   * Library screen.
+   * LIBRARY
    */
   return (
     <main className="library">
@@ -501,9 +665,12 @@ function App() {
                   index
                 )
               }
-              onClick={() =>
+              onClick={() => {
+                lastFocusedGameIndex.current =
+                  index
+
                 openGame(game.id)
-              }
+              }}
             >
               <div className="game-cover">
                 <span>
@@ -511,7 +678,9 @@ function App() {
                 </span>
               </div>
 
-              <h2>{game.title}</h2>
+              <h2>
+                {game.title}
+              </h2>
 
               <p
                 className={

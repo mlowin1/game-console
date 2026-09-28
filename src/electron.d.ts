@@ -29,6 +29,19 @@ declare global {
         sessionId: number | null
         startedAt?: string
       }>
+      onControllerCommand: (
+        callback: (
+          command:
+            | 'up'
+            | 'down'
+            | 'left'
+            | 'right'
+            | 'select'
+            | 'back'
+            | 'menu'
+            | 'secondary'
+        ) => void
+      ) => () => void
     }
   }
 

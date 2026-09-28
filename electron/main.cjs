@@ -13,6 +13,9 @@ const {
 const {
   getGameRuntimeStatus,
 } = require('./services/game-session-service.cjs')
+const {
+  startController,
+} = require('./services/controller-service.cjs')
 
 let mainWindow = null
 
@@ -51,6 +54,32 @@ app.whenReady().then(() => {
   } catch (error) {
     console.error('Steam startup sync failed:', error)
   }
+
+    startController({
+      onCommand: (command) => {
+        if (
+          mainWindow &&
+          !mainWindow.isDestroyed()
+        ) {
+          mainWindow.webContents.send(
+            'controller:command',
+            command
+          )
+        }
+      },
+
+      onConnected: (devicePath) => {
+        console.log(
+          `Controller ready: ${devicePath}`
+        )
+      },
+
+      onDisconnected: () => {
+        console.log(
+          'Controller disconnected'
+        )
+      },
+    })
 
     ipcMain.handle('games:getAll', () => {
       return getGames()

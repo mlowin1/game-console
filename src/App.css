@@ -141,3 +141,8 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.play-button:focus {
+  outline: 3px solid white;
+  outline-offset: 4px;
+}
