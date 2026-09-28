@@ -575,13 +575,27 @@ function App() {
           ← Back
         </button>
 
-        <h1>
-          {selectedGame.title}
-        </h1>
+        <div
+          className="game-hero"
+          style={
+            selectedGame.hero_image
+              ? {
+                   backgroundImage: `url("${selectedGame.hero_image}")`,
+                }
+              : undefined
+          } 
+        >
+          <div className="game-hero-overlay">
+            <div className="game-hero-content">
+              <h1>{selectedGame.title}</h1>
 
-        <p className="description">
-          {selectedGame.description}
-        </p>
+               <p className="description">
+                  {selectedGame.description ||
+                     'No description available.'}
+               </p>
+            </div>
+          </div>
+       </div>
 
         <h2>Owned On</h2>
 
@@ -673,9 +687,15 @@ function App() {
               }}
             >
               <div className="game-cover">
-                <span>
-                  {game.title}
-                </span>
+                {game.cover_image ? (
+                  <img
+                    src={game.cover_image}
+                    alt={`${game.title} cover`}
+                    className="game-cover-image"
+                  />
+                ) : (
+                  <span>{game.title}</span>
+                )}
               </div>
 
               <h2>

@@ -58,7 +58,8 @@ function initializeDatabase() {
       title TEXT NOT NULL,
       description TEXT,
       cover_image TEXT,
-      hero_image TEXT
+      hero_image TEXT,
+      logo_image TEXT
     );
 
     CREATE TABLE IF NOT EXISTS game_sources (
@@ -99,6 +100,26 @@ function initializeDatabase() {
         ON DELETE SET NULL
     );
   `)
+
+  const gameColumns = db
+    .prepare(`PRAGMA table_info(games)`)
+    .all()
+
+  const hasLogoImage =
+    gameColumns.some(
+      (column) => column.name === 'logo_image'
+    )
+
+  if (!hasLogoImage) {
+    db.exec(`
+      ALTER TABLE games
+      ADD COLUMN logo_image TEXT
+    `)
+
+    console.log(
+      'Database migration: added games.logo_image'
+    )
+  }
 
   return db
 }

@@ -5,11 +5,12 @@ function getGames() {
 
   const games = db.prepare(`
     SELECT
-      g.id,
-      g.title,
-      g.description,
-      g.cover_image,
-      g.hero_image,
+      id,
+      title,
+      description,
+      cover_image,
+      hero_image,
+      logo_image,
       CASE
         WHEN EXISTS (
           SELECT 1
