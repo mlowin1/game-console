@@ -16,6 +16,8 @@ const {
 const {
   startController,
 } = require('./services/controller-service.cjs')
+const CONSOLE_MODE =
+  process.env.GAME_CONSOLE_MODE === '1'
 
 let mainWindow = null
 
@@ -23,20 +25,86 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
+
     backgroundColor: '#111111',
+
+    fullscreen: false,
+    frame: !CONSOLE_MODE,
+  
+    autoHideMenuBar: true,
+
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: path.join(
+        __dirname,
+        'preload.cjs'
+      ),
+
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
   })
 
-  mainWindow.loadURL('http://localhost:5173')
+  /*
+   * Remove Electron's application menu.
+   *
+   * We don't want File/Edit/View/etc.
+   * appearing in the console UI.
+   */
+  mainWindow.setMenuBarVisibility(false)
+
+  if (CONSOLE_MODE) {
+    mainWindow.maximize()
+  } 
+ 
+  mainWindow.loadURL(
+    'http://localhost:5173'
+  )
+
+  mainWindow.on('enter-full-screen', () => {
+    console.log('ENTERED FULLSCREEN')
+  })
+
+  mainWindow.on('leave-full-screen', () => {
+    console.log('LEFT FULLSCREEN')
+  })
+
+  mainWindow.on('maximize', () => {
+    console.log('WINDOW MAXIMIZED')
+  })
+
+  mainWindow.on('unmaximize', () => {
+    console.log('WINDOW UNMAXIMIZED')
+  })
+
+  /*
+   * Development escape hatch.
+   *
+   * F11 toggles fullscreen even when we're
+   * testing console mode.
+   */
+    mainWindow.webContents.on(
+      'before-input-event',
+      (_event, input) => {
+        if (
+          input.type === 'keyDown' &&
+          input.key === 'F11'
+        ) {
+          console.log(
+            'F11 pressed. Current fullscreen:',
+            mainWindow.isFullScreen()
+          )
+
+          mainWindow.setFullScreen(
+            !mainWindow.isFullScreen()
+          )
+        }
+      }
+    )
 
   mainWindow.on('closed', () => {
     mainWindow = null
-})
+  })
 }
 
 app.whenReady().then(() => {
