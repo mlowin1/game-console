@@ -1,20 +1,11 @@
 const fs = require('fs')
 const path = require('path')
 
+const {
+  getControllerMapping,
+} = require('../controllers/mappings.cjs')
+
 const INPUT_BY_ID = '/dev/input/by-id'
-
-const BUTTONS = {
-  0: 'select',
-  1: 'back',
-  2: 'menu',
-  3: 'secondary',
-}
-
-const DPAD_HORIZONTAL_AXIS = 6
-const DPAD_VERTICAL_AXIS = 7
-
-const LEFT_STICK_X_AXIS = 0
-const LEFT_STICK_Y_AXIS = 1
 
 /*
  * Analog-stick thresholds.
@@ -82,8 +73,17 @@ function openController(
     onDisconnected,
   } = {}
 ) {
+  const mapping =
+    getControllerMapping(
+      path.basename(devicePath)
+    )
+
   console.log(
     `Controller detected: ${devicePath}`
+  )
+
+  console.log(
+    `Controller mapping: ${mapping.name}`
   )
 
   const stream =
@@ -274,7 +274,7 @@ function openController(
     }
 
     const command =
-      BUTTONS[number]
+      mapping.buttons[number]
 
     if (command) {
       emitCommand(command)
@@ -401,7 +401,7 @@ function openController(
   ) {
     if (
       number ===
-      DPAD_HORIZONTAL_AXIS
+      mapping.axes.dpadX
     ) {
       updateDpadHorizontal(
         value
@@ -412,7 +412,7 @@ function openController(
 
     if (
       number ===
-      DPAD_VERTICAL_AXIS
+      mapping.axes.dpadY
     ) {
       updateDpadVertical(
         value
@@ -568,7 +568,7 @@ function openController(
   ) {
     if (
       number ===
-      LEFT_STICK_X_AXIS
+      mapping.axes.leftStickX
     ) {
       updateStickHorizontal(
         value
@@ -579,7 +579,7 @@ function openController(
 
     if (
       number ===
-      LEFT_STICK_Y_AXIS
+      mapping.axes.leftStickY
     ) {
       updateStickVertical(
         value
