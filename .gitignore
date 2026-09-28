@@ -31,3 +31,7 @@ dist-ssr
 # Environment files
 .env
 .env.*
+
+# Local development Steam library
+dev-steam/
+dev-steam-drive2/

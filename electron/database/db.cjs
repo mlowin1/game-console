@@ -1,33 +1,64 @@
-const Database = require('better-sqlite3')
 const path = require('path')
-const { app } = require('electron')
+const os = require('os')
+const fs = require('fs')
+const Database = require('better-sqlite3')
 
-let db
+let db = null
+
+function getDatabasePath() {
+  // Explicit override is useful for tests and development tools.
+  if (process.env.LAUNCHER_DB_PATH) {
+    return process.env.LAUNCHER_DB_PATH
+  }
+
+  // When running inside Electron, use Electron's userData directory.
+  if (process.versions.electron) {
+    const { app } = require('electron')
+
+    return path.join(
+      app.getPath('userData'),
+      'launcher.db'
+    )
+  }
+
+  // When running from plain Node, mirror Electron's Linux
+  // user-data location.
+  const configHome =
+    process.env.XDG_CONFIG_HOME ||
+    path.join(os.homedir(), '.config')
+
+  return path.join(
+    configHome,
+    'game-console',
+    'launcher.db'
+  )
+}
 
 function initializeDatabase() {
-  const dbPath = path.join(app.getPath('userData'), 'launcher.db')
+  if (db) {
+    return db
+  }
+
+  const dbPath = getDatabasePath()
+
+  fs.mkdirSync(path.dirname(dbPath), {
+    recursive: true,
+  })
+
+  console.log(`Database: ${dbPath}`)
 
   db = new Database(dbPath)
 
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
 
-  createTables()
-
-  console.log(`Database initialized: ${dbPath}`)
-
-  return db
-}
-
-function createTables() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS games (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       description TEXT,
       cover_image TEXT,
-      hero_image TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      hero_image TEXT
     );
 
     CREATE TABLE IF NOT EXISTS game_sources (
@@ -36,12 +67,9 @@ function createTables() {
       store TEXT NOT NULL,
       store_game_id TEXT NOT NULL,
       owned INTEGER NOT NULL DEFAULT 1,
-
       FOREIGN KEY (game_id)
         REFERENCES games(id)
-        ON DELETE CASCADE,
-
-      UNIQUE(store, store_game_id)
+        ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS installations (
@@ -51,19 +79,18 @@ function createTables() {
       install_path TEXT,
       launch_method TEXT,
       launch_target TEXT,
-
       FOREIGN KEY (game_source_id)
         REFERENCES game_sources(id)
-        ON DELETE CASCADE,
-
-      UNIQUE(game_source_id)
+        ON DELETE CASCADE
     );
   `)
+
+  return db
 }
 
 function getDatabase() {
   if (!db) {
-    throw new Error('Database has not been initialized.')
+    return initializeDatabase()
   }
 
   return db
@@ -72,4 +99,5 @@ function getDatabase() {
 module.exports = {
   initializeDatabase,
   getDatabase,
+  getDatabasePath,
 }

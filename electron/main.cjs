@@ -7,6 +7,9 @@ const {
   getGameDetails,
 } = require('./database/games.cjs')
 const { launchGame } = require('./launcher.cjs')
+const {
+  syncSteam,
+} = require('./services/steam-service.cjs')
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -28,6 +31,18 @@ app.whenReady().then(() => {
   initializeDatabase()
   seedDatabase()
 
+  try {
+    const steamResult = syncSteam()
+
+    if (steamResult.found) {
+      console.log(
+        `Startup Steam sync: ${steamResult.games.length} game(s)`
+      )
+    }
+  } catch (error) {
+    console.error('Steam startup sync failed:', error)
+  }
+
     ipcMain.handle('games:getAll', () => {
       return getGames()
     })
@@ -46,6 +61,26 @@ app.whenReady().then(() => {
       }
 
       return launchGame(gameId)
+    })
+
+    ipcMain.handle('steam:sync', async () => {
+      try {
+        const result = syncSteam()
+
+        return {
+          success: true,
+          ...result,
+        }
+      } catch (error) {
+        console.error('Manual Steam sync failed:', error)
+
+        return {
+          success: false,
+          found: false,
+          games: [],
+          error: error.message,
+        }
+      }
     })
 
   createWindow()

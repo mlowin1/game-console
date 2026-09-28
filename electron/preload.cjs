@@ -11,4 +11,7 @@ contextBridge.exposeInMainWorld('launcher', {
 
   launchGame: (gameId) =>
     ipcRenderer.invoke('games:launch', gameId),
+
+  syncSteam: () =>
+    ipcRenderer.invoke('steam:sync'),
 })
