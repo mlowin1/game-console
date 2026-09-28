@@ -83,6 +83,21 @@ function initializeDatabase() {
         REFERENCES game_sources(id)
         ON DELETE CASCADE
     );
+ 
+    CREATE TABLE IF NOT EXISTS game_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id INTEGER NOT NULL,
+      source_id INTEGER,
+      status TEXT NOT NULL,
+      started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      ended_at TEXT,
+      FOREIGN KEY (game_id)
+        REFERENCES games(id)
+        ON DELETE CASCADE,
+      FOREIGN KEY (source_id)
+        REFERENCES game_sources(id)
+        ON DELETE SET NULL
+    );
   `)
 
   return db

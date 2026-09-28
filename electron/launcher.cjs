@@ -1,14 +1,20 @@
 const { getDatabase } = require('./database/db.cjs')
 const { launchNative } = require('./launchers/native.cjs')
 const { launchSteam } = require('./launchers/steam.cjs')
+const {
+  createSession,
+  monitorSteamSession,
+} = require('./services/game-session-service.cjs')
 
-function launchGame(gameId) {
+function launchGame(gameId, lifecycle = {}) {
   const db = getDatabase()
 
   const source = db.prepare(`
     SELECT
       g.title,
+      gs.id AS source_id,
       gs.store,
+      gs.store_game_id,
       i.install_state,
       i.launch_method,
       i.launch_target
@@ -39,8 +45,42 @@ function launchGame(gameId) {
       case 'native':
         return launchNative(source.launch_target)
 
-      case 'steam':
-        return launchSteam(source.launch_target)
+      case 'steam': {
+        const sessionId = createSession(
+          gameId,
+          source.source_id
+        )
+
+        const result =
+          launchSteam(source.launch_target)
+
+        if (!result.success) {
+          const db = getDatabase()
+
+          db.prepare(`
+            UPDATE game_sessions
+            SET
+              status = 'failed',
+              ended_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(sessionId)
+
+          return result
+        }
+
+        monitorSteamSession({
+          sessionId,
+          appId: source.store_game_id,
+          onStarted: lifecycle.onStarted,
+          onExited: lifecycle.onExited,
+          onFailed: lifecycle.onFailed,
+        })
+
+        return {
+          ...result,
+          sessionId,
+        }
+      }
 
       case 'proton':
         return {

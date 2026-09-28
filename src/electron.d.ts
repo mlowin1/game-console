@@ -22,6 +22,13 @@ declare global {
         success: boolean
         error?: string
       }>
+      getGameRuntimeStatus: (
+        gameId: number
+      ) => Promise<{
+        status: 'stopped' | 'launching' | 'running'
+        sessionId: number | null
+        startedAt?: string
+      }>
     }
   }
 

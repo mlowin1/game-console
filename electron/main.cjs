@@ -10,9 +10,14 @@ const { launchGame } = require('./launcher.cjs')
 const {
   syncSteam,
 } = require('./services/steam-service.cjs')
+const {
+  getGameRuntimeStatus,
+} = require('./services/game-session-service.cjs')
+
+let mainWindow = null
 
 function createWindow() {
-  const window = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 720,
     backgroundColor: '#111111',
@@ -24,7 +29,11 @@ function createWindow() {
     },
   })
 
-  window.loadURL('http://localhost:5173')
+  mainWindow.loadURL('http://localhost:5173')
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+})
 }
 
 app.whenReady().then(() => {
@@ -60,7 +69,28 @@ app.whenReady().then(() => {
         throw new Error('Invalid game ID')
       }
 
-      return launchGame(gameId)
+      return launchGame(gameId, {
+        onStarted: () => {
+          console.log('Game started — hiding launcher')
+
+          if (
+            mainWindow &&
+            !mainWindow.isDestroyed()
+          ) {
+            mainWindow.hide()
+          }
+        },
+
+        onExited: () => {
+          console.log('Game exited — restoring launcher')
+          restoreLauncherWindow()
+        },
+
+        onFailed: () => {
+          console.log('Game launch failed — restoring launcher')
+          restoreLauncherWindow()
+        },
+      })
     })
 
     ipcMain.handle('steam:sync', async () => {
@@ -83,7 +113,28 @@ app.whenReady().then(() => {
       }
     })
 
+    ipcMain.handle(
+      'games:runtime-status',
+      async (_event, gameId) => {
+        return getGameRuntimeStatus(gameId)
+      }
+    )
+
   createWindow()
+
+function restoreLauncherWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return
+  }
+
+  mainWindow.show()
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  mainWindow.focus()
+}
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

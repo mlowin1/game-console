@@ -14,4 +14,10 @@ contextBridge.exposeInMainWorld('launcher', {
 
   syncSteam: () =>
     ipcRenderer.invoke('steam:sync'),
+
+  getGameRuntimeStatus: (gameId) =>
+    ipcRenderer.invoke(
+      'games:runtime-status',
+      gameId
+    ),
 })

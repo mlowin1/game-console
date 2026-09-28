@@ -5,6 +5,10 @@ function App() {
   const [games, setGames] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] = useState<GameDetails | null>(null)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  
+  const [runtimeStatus, setRuntimeStatus] = useState<
+    'stopped' | 'launching' | 'running'
+  >('stopped')  
 
   useEffect(() => {
     window.launcher.getGames()
@@ -13,6 +17,40 @@ function App() {
         console.error('Failed to load games:', error)
       })
   }, [])
+
+  useEffect(() => {
+    if (!selectedGame) {
+      setRuntimeStatus('stopped')
+      return
+    }
+
+    let cancelled = false
+
+    async function checkRuntimeStatus() {
+      try {
+        const result =
+          await window.launcher.getGameRuntimeStatus(selectedGame!.id)
+
+        if (!cancelled) {
+          setRuntimeStatus(result.status)
+        }
+      } catch (error) {
+      console.error('Failed to get runtime status:', error)
+      }
+    }
+
+    checkRuntimeStatus()
+
+    const interval = window.setInterval(
+      checkRuntimeStatus,
+      1000
+    )
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [selectedGame])
 
   async function openGame(gameId: number) {
     try {
@@ -32,13 +70,17 @@ function App() {
 
   async function handlePlay(gameId: number) {
     try {
+      setRuntimeStatus('launching')
+
       const result = await window.launcher.launchGame(gameId)
 
       if (!result.success) {
         console.error('Launch failed:', result.error)
+        setRuntimeStatus('stopped')
       }
     } catch (error) {
       console.error('Failed to launch game:', error)
+      setRuntimeStatus('stopped')
     }
   }
 
@@ -80,10 +122,20 @@ function App() {
 
         <button
           className="play-button"
-          disabled={!installedSource}
+          disabled={
+            !installedSource ||
+            runtimeStatus === 'launching' ||
+            runtimeStatus === 'running'
+          }
           onClick={() => handlePlay(selectedGame.id)}
         >
-          {installedSource ? 'Play' : 'Install'}
+          {!installedSource
+            ? 'Install'
+            : runtimeStatus === 'launching'
+              ? 'Launching...'
+              : runtimeStatus === 'running'
+                ? '● Running'
+                : 'Play'}
         </button>
       </main>
     )
