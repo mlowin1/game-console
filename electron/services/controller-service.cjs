@@ -18,95 +18,92 @@ const LEFT_STICK_Y_AXIS = 1
 
 /*
  * Analog-stick thresholds.
- *
- * The stick must pass DEADZONE to activate.
- * It must return inside RELEASE_ZONE before
- * that axis is considered centered again.
  */
 const STICK_DEADZONE = 16000
 const STICK_RELEASE_ZONE = 8000
 
 /*
  * Console-style hold behavior.
- *
- * First movement happens immediately.
- * Repeating begins after REPEAT_DELAY.
- * Then movement repeats every REPEAT_INTERVAL.
  */
 const REPEAT_DELAY = 300
 const REPEAT_INTERVAL = 110
+
+/*
+ * How often we look for a controller when
+ * one isn't currently connected.
+ */
+const DISCOVERY_INTERVAL = 1000
 
 function findController() {
   if (!fs.existsSync(INPUT_BY_ID)) {
     return null
   }
 
-  const devices = fs.readdirSync(INPUT_BY_ID)
+  try {
+    const devices =
+      fs.readdirSync(INPUT_BY_ID)
 
-  const joystick = devices.find(
-    (device) =>
-      device.endsWith('-joystick') &&
-      !device.includes('-event-joystick')
-  )
+    const joystick = devices.find(
+      (device) =>
+        device.endsWith('-joystick') &&
+        !device.includes(
+          '-event-joystick'
+        )
+    )
 
-  if (!joystick) {
+    if (!joystick) {
+      return null
+    }
+
+    return path.join(
+      INPUT_BY_ID,
+      joystick
+    )
+  } catch (error) {
+    console.error(
+      'Failed to scan for controllers:',
+      error
+    )
+
     return null
   }
-
-  return path.join(
-    INPUT_BY_ID,
-    joystick
-  )
 }
 
-function startController({
-  onCommand,
-  onConnected,
-  onDisconnected,
-} = {}) {
-  const devicePath = findController()
-
-  if (!devicePath) {
-    console.log('No controller detected')
-    return null
-  }
-
+/*
+ * Open one controller and translate its
+ * Linux joystick events into normalized
+ * launcher commands.
+ */
+function openController(
+  devicePath,
+  {
+    onCommand,
+    onConnected,
+    onDisconnected,
+  } = {}
+) {
   console.log(
     `Controller detected: ${devicePath}`
   )
 
-  const stream = fs.createReadStream(
-    devicePath,
-    {
-      highWaterMark: 8,
-    }
-  )
+  const stream =
+    fs.createReadStream(
+      devicePath,
+      {
+        highWaterMark: 8,
+      }
+    )
 
-  /*
-   * Current analog-stick direction.
-   *
-   * -1 = left/up
-   *  0 = centered
-   *  1 = right/down
-   */
   const stickState = {
     horizontal: 0,
     vertical: 0,
   }
 
-  /*
-   * Track D-pad state separately from the
-   * analog stick.
-   */
   const dpadState = {
     horizontal: 0,
     vertical: 0,
   }
 
-  /*
-   * One repeat controller for each
-   * navigation direction.
-   */
   const repeatStates = {
     up: {
       sources: new Set(),
@@ -133,6 +130,8 @@ function startController({
     },
   }
 
+  let disconnected = false
+
   function emitCommand(command) {
     console.log(
       `Controller command: ${command}`
@@ -143,16 +142,6 @@ function startController({
     }
   }
 
-  /*
-   * Start navigation for a particular source.
-   *
-   * Example sources:
-   *
-   * dpad-horizontal
-   * dpad-vertical
-   * stick-horizontal
-   * stick-vertical
-   */
   function startDirection(
     direction,
     source
@@ -164,10 +153,6 @@ function startController({
       return
     }
 
-    /*
-     * Ignore duplicate events from the same
-     * physical control while it remains held.
-     */
     if (state.sources.has(source)) {
       return
     }
@@ -177,44 +162,39 @@ function startController({
 
     state.sources.add(source)
 
-    /*
-     * If another source already holds this
-     * direction, don't create another timer.
-     */
     if (!wasInactive) {
       return
     }
 
     /*
-     * Immediate first movement.
+     * Immediate movement.
      */
     emitCommand(direction)
 
     /*
-     * Wait briefly before beginning repeat.
+     * Begin repeating after a short delay.
      */
-    state.delayTimer = setTimeout(() => {
-      state.delayTimer = null
+    state.delayTimer =
+      setTimeout(() => {
+        state.delayTimer = null
 
-      /*
-       * The direction may have been released
-       * during the initial delay.
-       */
-      if (state.sources.size === 0) {
-        return
-      }
+        if (
+          state.sources.size === 0
+        ) {
+          return
+        }
 
-      state.intervalTimer =
-        setInterval(() => {
-          if (
-            state.sources.size === 0
-          ) {
-            return
-          }
+        state.intervalTimer =
+          setInterval(() => {
+            if (
+              state.sources.size === 0
+            ) {
+              return
+            }
 
-          emitCommand(direction)
-        }, REPEAT_INTERVAL)
-    }, REPEAT_DELAY)
+            emitCommand(direction)
+          }, REPEAT_INTERVAL)
+      }, REPEAT_DELAY)
   }
 
   function stopDirection(
@@ -230,10 +210,6 @@ function startController({
 
     state.sources.delete(source)
 
-    /*
-     * Another physical control may still be
-     * holding this same direction.
-     */
     if (state.sources.size > 0) {
       return
     }
@@ -278,6 +254,12 @@ function startController({
         state.intervalTimer = null
       }
     }
+
+    stickState.horizontal = 0
+    stickState.vertical = 0
+
+    dpadState.horizontal = 0
+    dpadState.vertical = 0
   }
 
   function handleButton(
@@ -285,8 +267,7 @@ function startController({
     value
   ) {
     /*
-     * Face buttons currently fire only
-     * on button-down.
+     * Only act on button-down.
      */
     if (value !== 1) {
       return
@@ -321,9 +302,6 @@ function startController({
       return
     }
 
-    /*
-     * Release previous direction.
-     */
     if (
       dpadState.horizontal === -1
     ) {
@@ -345,9 +323,6 @@ function startController({
     dpadState.horizontal =
       nextState
 
-    /*
-     * Start new direction.
-     */
     if (nextState === -1) {
       startDirection(
         'left',
@@ -612,6 +587,29 @@ function startController({
     }
   }
 
+  /*
+   * We only want disconnect cleanup to run
+   * once. Depending on the failure, Node can
+   * emit both error and close.
+   */
+  function handleDisconnect() {
+    if (disconnected) {
+      return
+    }
+
+    disconnected = true
+
+    stopAllDirections()
+
+    console.log(
+      'Controller disconnected'
+    )
+
+    if (onDisconnected) {
+      onDisconnected()
+    }
+  }
+
   stream.on('open', () => {
     console.log(
       'Controller connected'
@@ -653,9 +651,6 @@ function startController({
         continue
       }
 
-      /*
-       * Button event.
-       */
       if (eventType === 0x01) {
         handleButton(
           number,
@@ -665,9 +660,6 @@ function startController({
         continue
       }
 
-      /*
-       * Axis event.
-       */
       if (eventType === 0x02) {
         const handledAsDpad =
           handleDpad(
@@ -686,27 +678,131 @@ function startController({
   })
 
   stream.on('error', (error) => {
-    stopAllDirections()
-
+    /*
+     * Device removal commonly causes a stream
+     * error. The manager will begin searching
+     * for another controller afterward.
+     */
     console.error(
-      'Controller error:',
-      error
+      'Controller stream error:',
+      error.message
     )
+
+    handleDisconnect()
   })
 
   stream.on('close', () => {
-    stopAllDirections()
-
-    console.log(
-      'Controller disconnected'
-    )
-
-    if (onDisconnected) {
-      onDisconnected()
-    }
+    handleDisconnect()
   })
 
   return stream
+}
+
+/*
+ * Controller manager.
+ *
+ * Unlike the old implementation, this keeps
+ * searching when no controller is available
+ * and resumes searching after disconnection.
+ */
+function startController({
+  onCommand,
+  onConnected,
+  onDisconnected,
+} = {}) {
+  let activeStream = null
+  let activeDevicePath = null
+  let stopped = false
+
+  function scan() {
+    if (
+      stopped ||
+      activeStream
+    ) {
+      return
+    }
+
+    const devicePath =
+      findController()
+
+    if (!devicePath) {
+      return
+    }
+
+    activeDevicePath =
+      devicePath
+
+    activeStream =
+      openController(
+        devicePath,
+        {
+          onCommand,
+
+          onConnected:
+            (connectedPath) => {
+              if (onConnected) {
+                onConnected(
+                  connectedPath
+                )
+              }
+            },
+
+          onDisconnected: () => {
+            /*
+             * Clear the active controller so
+             * the next discovery pass can
+             * reconnect it or find another.
+             */
+            activeStream = null
+            activeDevicePath = null
+
+            if (onDisconnected) {
+              onDisconnected()
+            }
+          },
+        }
+      )
+  }
+
+  /*
+   * Search immediately.
+   */
+  scan()
+
+  /*
+   * Continue searching whenever no controller
+   * is currently active.
+   */
+  const discoveryTimer =
+    setInterval(
+      scan,
+      DISCOVERY_INTERVAL
+    )
+
+  /*
+   * Return a manager object instead of the raw
+   * stream. This gives us a clean shutdown API.
+   */
+  return {
+    stop() {
+      stopped = true
+
+      clearInterval(
+        discoveryTimer
+      )
+
+      if (activeStream) {
+        activeStream.destroy()
+        activeStream = null
+      }
+
+      activeDevicePath = null
+    },
+
+    getConnectedDevice() {
+      return activeDevicePath
+    },
+  }
 }
 
 module.exports = {
