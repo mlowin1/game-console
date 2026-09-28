@@ -53,3 +53,82 @@
 .not-installed {
   color: #999;
 }
+
+.game-card {
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.game-card:hover .game-cover {
+  outline: 3px solid white;
+  transform: scale(1.03);
+}
+
+.game-cover {
+  transition:
+    transform 0.15s ease,
+    outline 0.15s ease;
+}
+
+.details {
+  min-height: 100vh;
+  padding: 48px;
+  background: #111;
+  color: white;
+}
+
+.back-button {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 18px;
+  cursor: pointer;
+  margin-bottom: 40px;
+}
+
+.back-button:hover {
+  color: white;
+}
+
+.details h1 {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.description {
+  max-width: 600px;
+  color: #bbb;
+  font-size: 18px;
+  line-height: 1.5;
+  margin-bottom: 40px;
+}
+
+.source-list {
+  max-width: 500px;
+  margin-bottom: 40px;
+}
+
+.source-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid #333;
+}
+
+.play-button {
+  padding: 16px 48px;
+  border: none;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.play-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

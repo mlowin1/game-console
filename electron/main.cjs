@@ -2,7 +2,11 @@ const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const { initializeDatabase } = require('./database/db.cjs')
 const { seedDatabase } = require('./database/seed.cjs')
-const { getGames } = require('./database/games.cjs')
+const {
+  getGames,
+  getGameDetails,
+} = require('./database/games.cjs')
+const { launchGame } = require('./launcher.cjs')
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -26,6 +30,22 @@ app.whenReady().then(() => {
 
     ipcMain.handle('games:getAll', () => {
       return getGames()
+    })
+
+    ipcMain.handle('games:getDetails', (_event, gameId) => {
+      if (!Number.isInteger(gameId)) {
+        throw new Error('Invalid game ID')
+      }
+
+      return getGameDetails(gameId)
+    })
+
+    ipcMain.handle('games:launch', (_event, gameId) => {
+      if (!Number.isInteger(gameId)) {
+        throw new Error('Invalid game ID')
+      }
+
+      return launchGame(gameId)
     })
 
   createWindow()

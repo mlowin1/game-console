@@ -5,4 +5,10 @@ contextBridge.exposeInMainWorld('launcher', {
   version: '0.1.0',
 
   getGames: () => ipcRenderer.invoke('games:getAll'),
+
+  getGameDetails: (gameId) =>
+    ipcRenderer.invoke('games:getDetails', gameId),
+
+  launchGame: (gameId) =>
+    ipcRenderer.invoke('games:launch', gameId),
 })
