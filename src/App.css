@@ -68,6 +68,15 @@
   transform: scale(1.03);
 }
 
+.game-card:focus-visible {
+  outline: none;
+}
+
+.game-card:focus-visible .game-cover {
+  outline: 3px solid white;
+  transform: scale(1.03);
+}
+
 .game-cover {
   transition:
     transform 0.15s ease,
