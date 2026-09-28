@@ -1,5 +1,6 @@
 const { getDatabase } = require('./database/db.cjs')
 const { launchNative } = require('./launchers/native.cjs')
+const { launchSteam } = require('./launchers/steam.cjs')
 
 function launchGame(gameId) {
   const db = getDatabase()
@@ -39,10 +40,7 @@ function launchGame(gameId) {
         return launchNative(source.launch_target)
 
       case 'steam':
-        return {
-          success: false,
-          error: 'Steam launching is not implemented yet',
-        }
+        return launchSteam(source.launch_target)
 
       case 'proton':
         return {

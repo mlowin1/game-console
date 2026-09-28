@@ -1,19 +1,26 @@
+const os = require('os')
 const path = require('path')
-const { initializeDatabase } =
-  require('../../database/db.cjs')
 
-const { importSteamLibrary } =
-  require('./importer.cjs')
+const {
+  initializeDatabase,
+} = require('../../database/db.cjs')
+
+const {
+  importSteamLibrary,
+} = require('./importer.cjs')
 
 initializeDatabase()
 
-const libraryPath = path.resolve(
-  __dirname,
-  '../../../dev-steam'
+const steamRoot = path.join(
+  os.homedir(),
+  '.local',
+  'share',
+  'Steam'
 )
 
-const results =
-  importSteamLibrary(libraryPath)
+console.log(`Steam root: ${steamRoot}`)
+
+const results = importSteamLibrary(steamRoot)
 
 console.log('\nSteam import complete:\n')
 

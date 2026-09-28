@@ -6,6 +6,19 @@ const {
   parseLibraryFolders,
 } = require('./parser.cjs')
 
+const SYSTEM_COMPONENT_PATTERNS = [
+  /^Steam Linux Runtime/i,
+  /^Proton/i,
+  /^Steamworks Common Redistributables$/i,
+  /^Steam Controller Configs$/i,
+]
+
+function isSteamSystemComponent(game) {
+  return SYSTEM_COMPONENT_PATTERNS.some((pattern) =>
+    pattern.test(game.name)
+  )
+}
+
 function scanSteamLibrary(libraryPath) {
   const steamAppsPath = path.join(
     libraryPath,
@@ -14,26 +27,28 @@ function scanSteamLibrary(libraryPath) {
 
   const manifests = findManifests(steamAppsPath)
 
-  return manifests.map((manifestPath) => {
-    const game = parseManifest(manifestPath)
+  return manifests
+    .map((manifestPath) => {
+      const game = parseManifest(manifestPath)
 
-    return {
-      ...game,
+      return {
+        ...game,
 
-      libraryPath,
+        libraryPath,
 
-      installPath: path.join(
-        steamAppsPath,
-        'common',
-        game.installDir
-      ),
+        installPath: path.join(
+          steamAppsPath,
+          'common',
+          game.installDir
+        ),
 
-      launchMethod: 'steam',
+        launchMethod: 'steam',
 
-      launchTarget:
-        `steam://rungameid/${game.appId}`,
-    }
-  })
+        launchTarget:
+          `steam://rungameid/${game.appId}`,
+      }
+    })
+    .filter((game) => !isSteamSystemComponent(game))
 }
 
 function scanSteamInstallation(steamRootPath) {
