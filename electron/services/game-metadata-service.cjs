@@ -14,7 +14,17 @@ async function refreshSteamMetadata() {
       gs.game_id,
       gs.store_game_id
     FROM game_sources gs
+    JOIN games g
+      ON g.id = gs.game_id
     WHERE gs.store = 'steam'
+      AND (
+        g.description IS NULL
+        OR g.description = ''
+        OR g.cover_image IS NULL
+        OR g.cover_image = ''
+        OR g.hero_image IS NULL
+        OR g.hero_image = ''
+      )
   `).all()
 
   let updated = 0

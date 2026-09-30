@@ -11,6 +11,9 @@ const {
   syncSteam,
 } = require('./services/steam-service.cjs')
 const {
+  refreshSteamMetadata,
+} = require('./services/game-metadata-service.cjs')
+const {
   getGameRuntimeStatus,
 } = require('./services/game-session-service.cjs')
 const {
@@ -107,7 +110,7 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   initializeDatabase()
   seedDatabase()
 
@@ -121,6 +124,20 @@ app.whenReady().then(() => {
     }
   } catch (error) {
     console.error('Steam startup sync failed:', error)
+  }
+
+  try {
+    const metadataResult =
+      await refreshSteamMetadata()
+
+    console.log(
+      `Startup metadata refresh: ${metadataResult.updated} updated, ${metadataResult.failed} failed`
+    )
+  } catch (error) {
+    console.error(
+      'Startup metadata refresh failed:',
+      error
+    )
   }
 
     startController({
