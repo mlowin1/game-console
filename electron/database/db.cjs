@@ -101,25 +101,83 @@ function initializeDatabase() {
     );
   `)
 
-  const gameColumns = db
-    .prepare(`PRAGMA table_info(games)`)
-    .all()
+    /*
+    * Lightweight database migrations.
+    *
+    * CREATE TABLE IF NOT EXISTS does not add new
+    * columns to an existing SQLite database, so we
+    * explicitly add columns when upgrading an older
+    * launcher database.
+    */
+    const gameColumns =
+      db.prepare(`
+        PRAGMA table_info(games)
+      `).all()
 
-  const hasLogoImage =
-    gameColumns.some(
-      (column) => column.name === 'logo_image'
-    )
+    const gameColumnNames =
+      new Set(
+        gameColumns.map(
+          (column) => column.name
+        )
+      )
 
-  if (!hasLogoImage) {
-    db.exec(`
-      ALTER TABLE games
-      ADD COLUMN logo_image TEXT
-    `)
+    /*
+    * Older databases may not have logo_image.
+    */
+    if (!gameColumnNames.has('logo_image')) {
+      db.exec(`
+        ALTER TABLE games
+        ADD COLUMN logo_image TEXT
+      `)
 
-    console.log(
-      'Database migration: added games.logo_image'
-    )
-  }
+      console.log(
+        'Database migration: added games.logo_image'
+      )
+    }
+
+    /*
+    * Track which provider supplied the cover.
+    */
+    if (!gameColumnNames.has('cover_source')) {
+      db.exec(`
+        ALTER TABLE games
+        ADD COLUMN cover_source TEXT
+      `)
+
+      console.log(
+        'Database migration: added games.cover_source'
+      )
+    }
+
+    /*
+    * Track when metadata was last successfully
+    * checked so we don't hit APIs every boot.
+    */
+    if (!gameColumnNames.has('metadata_refreshed_at')) {
+      db.exec(`
+        ALTER TABLE games
+        ADD COLUMN metadata_refreshed_at TEXT
+      `)
+
+      console.log(
+        'Database migration: added games.metadata_refreshed_at'
+      )
+    }
+
+    /*
+    * Track the result of the most recent metadata
+    * refresh.
+    */
+    if (!gameColumnNames.has('metadata_refresh_status')) {
+      db.exec(`
+        ALTER TABLE games
+        ADD COLUMN metadata_refresh_status TEXT
+      `)
+
+      console.log(
+        'Database migration: added games.metadata_refresh_status'
+      )
+    }
 
   return db
 }
