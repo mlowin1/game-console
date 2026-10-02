@@ -90,6 +90,30 @@ async function getGameBySteamAppId(appId) {
   return response.data
 }
 
+async function getGameByName(name) {
+  const response =
+    await getJson(
+      `/search/autocomplete/${encodeURIComponent(name)}`
+    )
+
+  if (
+    !response.success ||
+    !Array.isArray(response.data) ||
+    response.data.length === 0
+  ) {
+    return null
+  }
+
+  const normalizedName =
+    String(name).trim().toLowerCase()
+
+  return response.data.find(
+    (game) =>
+      String(game.name).trim().toLowerCase() ===
+      normalizedName
+  ) ?? response.data[0]
+}
+
 /*
  * Get a 600x900 static grid.
  *
@@ -133,8 +157,108 @@ async function getSteamGridArtwork(appId) {
   }
 }
 
+async function getSteamGridArtworkByName(name) {
+  const game = await getGameByName(name)
+
+  if (!game) {
+    return null
+  }
+
+  return {
+    gameId: game.id,
+    name: game.name ?? null,
+    coverImage: await getGridForGame(game.id),
+  }
+}
+
+async function getGridOptionsForGame(
+  gameId,
+  limit = 12
+) {
+  const response =
+    await getJson(
+      `/grids/game/${encodeURIComponent(gameId)}` +
+      '?dimensions=600x900' +
+      '&types=static'
+    )
+
+  if (
+    !response.success ||
+    !Array.isArray(response.data)
+  ) {
+    return []
+  }
+
+  return response.data
+    .filter((grid) => grid.url)
+    .slice(0, limit)
+    .map((grid) => ({
+      id: grid.id,
+      url: grid.url,
+      width: grid.width ?? null,
+      height: grid.height ?? null,
+      score: grid.score ?? null,
+    }))
+}
+
+async function getSteamGridArtworkOptions(
+  appId,
+  limit = 12
+) {
+  const game =
+    await getGameBySteamAppId(appId)
+
+  if (!game) {
+    return {
+      game: null,
+      artwork: [],
+    }
+  }
+
+  const artwork =
+    await getGridOptionsForGame(
+      game.id,
+      limit
+    )
+
+  return {
+    game: {
+      id: game.id,
+      name: game.name ?? null,
+    },
+    artwork,
+  }
+}
+
+async function getSteamGridArtworkOptionsByName(
+  name,
+  limit = 12
+) {
+  const game = await getGameByName(name)
+
+  if (!game) {
+    return {
+      game: null,
+      artwork: [],
+    }
+  }
+
+  return {
+    game: {
+      id: game.id,
+      name: game.name ?? null,
+    },
+    artwork: await getGridOptionsForGame(game.id, limit),
+  }
+}
+
 module.exports = {
   getGameBySteamAppId,
+  getGameByName,
   getGridForGame,
   getSteamGridArtwork,
+  getSteamGridArtworkByName,
+  getGridOptionsForGame,
+  getSteamGridArtworkOptions,
+  getSteamGridArtworkOptionsByName,
 }

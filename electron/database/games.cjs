@@ -8,9 +8,24 @@ function getGames() {
       id,
       title,
       description,
-      cover_image,
+      COALESCE(
+        g.cover_override,
+        g.cover_image
+      ) AS cover_image,
       hero_image,
       logo_image,
+      COALESCE((
+        SELECT GROUP_CONCAT(DISTINCT gs.store)
+        FROM game_sources gs
+        WHERE gs.game_id = g.id
+          AND gs.owned = 1
+      ), '') AS stores,
+      (
+        SELECT MAX(gs.started_at)
+        FROM game_sessions gs
+        WHERE gs.game_id = g.id
+          AND gs.status IN ('running', 'exited')
+      ) AS last_played_at,
       CASE
         WHEN EXISTS (
           SELECT 1
@@ -38,7 +53,13 @@ function getGameDetails(gameId) {
       id,
       title,
       description,
-      cover_image,
+      COALESCE(
+        cover_override,
+        cover_image
+      ) AS cover_image,
+      cover_image AS automatic_cover_image,
+      cover_override,
+      cover_source,
       hero_image
     FROM games
     WHERE id = ?
@@ -73,7 +94,39 @@ function getGameDetails(gameId) {
   }
 }
 
+function setCoverOverride(
+  gameId,
+  coverUrl
+) {
+  const db = getDatabase()
+
+  const result = db.prepare(`
+    UPDATE games
+    SET cover_override = ?
+    WHERE id = ?
+  `).run(
+    coverUrl,
+    gameId
+  )
+
+  return result.changes > 0
+}
+
+function clearCoverOverride(gameId) {
+  const db = getDatabase()
+
+  const result = db.prepare(`
+    UPDATE games
+    SET cover_override = NULL
+    WHERE id = ?
+  `).run(gameId)
+
+  return result.changes > 0
+}
+
 module.exports = {
   getGames,
   getGameDetails,
+  setCoverOverride,
+  clearCoverOverride,
 }

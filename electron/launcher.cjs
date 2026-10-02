@@ -1,8 +1,11 @@
 const { getDatabase } = require('./database/db.cjs')
 const { launchNative } = require('./launchers/native.cjs')
 const { launchSteam } = require('./launchers/steam.cjs')
+const { launchEpic } = require('./launchers/epic.cjs')
 const {
   createSession,
+  updateSessionStatus,
+  endSession,
   monitorSteamSession,
 } = require('./services/game-session-service.cjs')
 
@@ -16,6 +19,7 @@ function launchGame(gameId, lifecycle = {}) {
       gs.store,
       gs.store_game_id,
       i.install_state,
+      i.install_path,
       i.launch_method,
       i.launch_target
     FROM games g
@@ -80,6 +84,37 @@ function launchGame(gameId, lifecycle = {}) {
           ...result,
           sessionId,
         }
+      }
+
+      case 'epic': {
+        const sessionId = createSession(
+          gameId,
+          source.source_id
+        )
+
+        return launchEpic(source.store_game_id, {
+          onStarted: () => {
+            updateSessionStatus(sessionId, 'running')
+            lifecycle.onStarted?.()
+          },
+          onExited: () => {
+            endSession(sessionId)
+            lifecycle.onExited?.()
+          },
+          onFailed: () => {
+            updateSessionStatus(sessionId, 'failed')
+            lifecycle.onFailed?.()
+          },
+        }).then((result) => {
+          if (!result.success) {
+            updateSessionStatus(sessionId, 'failed')
+          }
+
+          return {
+            ...result,
+            sessionId,
+          }
+        }, source.install_path)
       }
 
       case 'proton':

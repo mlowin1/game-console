@@ -170,6 +170,8 @@ function getGameRuntimeStatus(gameId) {
 
 module.exports = {
   createSession,
+  updateSessionStatus,
+  endSession,
   monitorSteamSession,
   getGameRuntimeStatus,
 }

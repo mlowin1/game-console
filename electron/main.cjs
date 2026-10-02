@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 const { app, BrowserWindow, ipcMain } = require('electron')
 const path = require('path')
 const { initializeDatabase } = require('./database/db.cjs')
@@ -5,11 +7,17 @@ const { seedDatabase } = require('./database/seed.cjs')
 const {
   getGames,
   getGameDetails,
+  setCoverOverride,
+  clearCoverOverride,
 } = require('./database/games.cjs')
 const { launchGame } = require('./launcher.cjs')
 const {
   syncSteam,
 } = require('./services/steam-service.cjs')
+const {
+  getEpicConnectionStatus,
+  syncEpic,
+} = require('./services/epic-service.cjs')
 const {
   refreshSteamMetadata,
 } = require('./services/game-metadata-service.cjs')
@@ -21,11 +29,32 @@ const {
 } = require('./services/controller-service.cjs')
 const CONSOLE_MODE =
   process.env.GAME_CONSOLE_MODE === '1'
+const {
+  getOwnedSteamGames,
+} = require('./services/steam-owned-games-service.cjs')
+
+const {
+  importOwnedSteamGames,
+} = require('./integrations/steam/owned-library-importer.cjs')
+
+const {
+  getSteamGridArtworkOptions,
+  getSteamGridArtworkOptionsByName,
+} = require('./services/steamgriddb-service.cjs')
+
+const {
+  installGame,
+  uninstallGame,
+  getGameInstallStatus,
+} = require(
+  './services/game-install-service.cjs'
+)
 
 let mainWindow = null
 
 function createWindow() {
   mainWindow = new BrowserWindow({
+    title: 'FinalForm',
     width: 1280,
     height: 720,
 
@@ -115,6 +144,23 @@ app.whenReady().then(async () => {
   seedDatabase()
 
   try {
+    const ownedGames =
+      await getOwnedSteamGames()
+
+    const ownedResult =
+      importOwnedSteamGames(ownedGames)
+
+    console.log(
+      `Steam owned library sync: ${ownedResult.total} total, ${ownedResult.added} added, ${ownedResult.updated} updated`
+    )
+  } catch (error) {
+    console.error(
+      'Steam owned library sync failed:',
+      error
+    )
+  }
+
+  try {
     const steamResult = syncSteam()
 
     if (steamResult.found) {
@@ -178,6 +224,72 @@ app.whenReady().then(async () => {
       return getGameDetails(gameId)
     })
 
+    ipcMain.handle(
+      'games:getArtworkOptions',
+      async (_event, gameId) => {
+        if (!Number.isInteger(gameId)) {
+          throw new Error('Invalid game ID')
+        }
+
+        const game =
+          getGameDetails(gameId)
+
+        if (!game) {
+          throw new Error('Game not found')
+        }
+
+        const steamSource = game.sources.find(
+          (source) => source.store === 'steam'
+        )
+
+        if (steamSource) {
+          return getSteamGridArtworkOptions(
+            steamSource.store_game_id,
+            12
+          )
+        }
+
+        return getSteamGridArtworkOptionsByName(
+          game.title,
+          12
+        )
+      }
+    )
+
+    ipcMain.handle(
+      'games:setCoverOverride',
+      (_event, gameId, coverUrl) => {
+        if (!Number.isInteger(gameId)) {
+          throw new Error('Invalid game ID')
+        }
+
+        if (
+          typeof coverUrl !== 'string' ||
+          !coverUrl.startsWith('https://')
+        ) {
+          throw new Error(
+            'Invalid cover URL'
+          )
+        }
+
+        return setCoverOverride(
+          gameId,
+          coverUrl
+        )
+      }
+    )
+
+    ipcMain.handle(
+      'games:clearCoverOverride',
+      (_event, gameId) => {
+        if (!Number.isInteger(gameId)) {
+          throw new Error('Invalid game ID')
+        }
+
+        return clearCoverOverride(gameId)
+      }
+    )
+
     ipcMain.handle('games:launch', (_event, gameId) => {
       if (!Number.isInteger(gameId)) {
         throw new Error('Invalid game ID')
@@ -207,13 +319,56 @@ app.whenReady().then(async () => {
       })
     })
 
+    ipcMain.handle(
+      'games:install',
+      (_event, gameId) => {
+        if (!Number.isInteger(gameId)) {
+          throw new Error(
+            'Invalid game ID'
+          )
+        }
+
+        return installGame(gameId)
+      }
+    )
+
+    ipcMain.handle(
+      'games:uninstall',
+      (_event, gameId) => {
+        if (!Number.isInteger(gameId)) {
+          throw new Error(
+            'Invalid game ID'
+          )
+        }
+
+        return uninstallGame(gameId)
+      }
+    )
+
+    ipcMain.handle(
+      'games:install-status',
+      async (_event, gameId) => {
+        if (!Number.isInteger(gameId)) {
+          throw new Error(
+            'Invalid game ID'
+          )
+        }
+
+        return await getGameInstallStatus(
+          gameId
+        )
+      }
+    )
+
     ipcMain.handle('steam:sync', async () => {
       try {
-        const result = syncSteam()
+        const steamResult = syncSteam()
+        const epicResult = await syncEpic()
 
         return {
           success: true,
-          ...result,
+          ...steamResult,
+          epic: epicResult,
         }
       } catch (error) {
         console.error('Manual Steam sync failed:', error)
@@ -225,6 +380,57 @@ app.whenReady().then(async () => {
           error: error.message,
         }
       }
+    })
+
+    ipcMain.handle('epic:sync', async () => {
+      try {
+        const epicResult = await syncEpic()
+        let metadataResult = null
+
+        try {
+          metadataResult = await refreshSteamMetadata({
+            force: true,
+            store: 'epic',
+          })
+        } catch (error) {
+          console.warn('Epic metadata refresh failed:', error.message)
+        }
+
+        return {
+          success: true,
+          ...epicResult,
+          metadata: metadataResult,
+        }
+      } catch (error) {
+        console.error('Manual Epic sync failed:', error)
+
+        return {
+          success: false,
+          found: false,
+          games: [],
+          error: error.message,
+        }
+      }
+    })
+
+    ipcMain.handle('epic:status', async () => {
+      return await getEpicConnectionStatus()
+    })
+
+    ipcMain.handle('launcher:show', () => {
+      restoreLauncherWindow()
+      return { success: true }
+    })
+
+    ipcMain.handle('launcher:hide', () => {
+      if (
+        mainWindow &&
+        !mainWindow.isDestroyed()
+      ) {
+        mainWindow.hide()
+      }
+
+      return { success: true }
     })
 
     ipcMain.handle(

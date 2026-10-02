@@ -179,6 +179,23 @@ function initializeDatabase() {
       )
     }
 
+      /*
+      * Optional user-selected cover artwork.
+      *
+      * When present, this takes priority over the
+      * automatically selected provider artwork.
+      */
+      if (!gameColumnNames.has('cover_override')) {
+        db.exec(`
+          ALTER TABLE games
+          ADD COLUMN cover_override TEXT
+        `)
+
+        console.log(
+          'Database migration: added games.cover_override'
+        )
+      }
+
   return db
 }
 

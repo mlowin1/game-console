@@ -4,10 +4,16 @@ const {
 
 const {
   getSteamMetadata,
+  getSteamMetadataByTitle,
 } = require('./steam-metadata-service.cjs')
 
 const {
+  getEpicMetadata,
+} = require('./epic-metadata-service.cjs')
+
+const {
   getSteamGridArtwork,
+  getSteamGridArtworkByName,
 } = require('./steamgriddb-service.cjs')
 
 /*
@@ -20,8 +26,13 @@ const METADATA_MAX_AGE_DAYS = 7
 
 async function refreshSteamMetadata({
   force = false,
+  store = null,
 } = {}) {
   const db = getDatabase()
+  const storeFilter = store
+    ? 'AND gs.store = ?'
+    : ''
+  const storeParams = store ? [store] : []
 
   let sources
 
@@ -35,6 +46,7 @@ async function refreshSteamMetadata({
     sources = db.prepare(`
       SELECT
         gs.game_id,
+        gs.store,
         gs.store_game_id,
         g.title,
         g.description,
@@ -45,8 +57,9 @@ async function refreshSteamMetadata({
       FROM game_sources gs
       JOIN games g
         ON g.id = gs.game_id
-      WHERE gs.store = 'steam'
-    `).all()
+      WHERE gs.store IN ('steam', 'epic')
+        ${storeFilter}
+    `).all(...storeParams)
   } else {
     /*
      * Normal startup only refreshes games whose
@@ -56,6 +69,7 @@ async function refreshSteamMetadata({
     sources = db.prepare(`
       SELECT
         gs.game_id,
+        gs.store,
         gs.store_game_id,
         g.title,
         g.description,
@@ -66,7 +80,8 @@ async function refreshSteamMetadata({
       FROM game_sources gs
       JOIN games g
         ON g.id = gs.game_id
-      WHERE gs.store = 'steam'
+      WHERE gs.store IN ('steam', 'epic')
+        ${storeFilter}
         AND (
           g.metadata_refreshed_at IS NULL
           OR datetime(
@@ -77,6 +92,7 @@ async function refreshSteamMetadata({
           )
         )
     `).all(
+      ...storeParams,
       METADATA_MAX_AGE_DAYS
     )
   }
@@ -92,22 +108,90 @@ async function refreshSteamMetadata({
       /*
        * Steam is our primary metadata provider.
        */
-      try {
-        metadata =
-          await getSteamMetadata(
-            source.store_game_id
+      if (source.store === 'epic') {
+        try {
+          metadata =
+            getEpicMetadata(
+              source.store_game_id
+            )
+
+          const hasEpicDescription =
+            metadata?.description &&
+            metadata.description.trim().toLowerCase() !==
+              source.title.trim().toLowerCase()
+
+          if (
+            !hasEpicDescription ||
+            !metadata?.heroImage
+          ) {
+            const storefrontMetadata =
+              await getSteamMetadataByTitle(
+                source.title
+              )
+
+            if (storefrontMetadata) {
+              metadata = {
+                ...metadata,
+                description:
+                  hasEpicDescription
+                    ? metadata.description
+                    : storefrontMetadata.description,
+                heroImage:
+                  metadata?.heroImage ??
+                  storefrontMetadata.heroImage,
+                logoImage:
+                  metadata?.logoImage ??
+                  storefrontMetadata.logoImage,
+              }
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `Epic metadata unavailable for ${source.store_game_id}:`,
+            error.message
           )
-      } catch (error) {
-        console.warn(
-          `Steam metadata unavailable for ${source.store_game_id}:`,
-          error.message
-        )
+        }
+      } else {
+        try {
+          metadata =
+            await getSteamMetadata(
+              source.store_game_id
+            )
+        } catch (error) {
+          console.warn(
+            `Steam metadata unavailable for ${source.store_game_id}:`,
+            error.message
+          )
+        }
       }
 
-      const description =
+      let description =
         metadata?.description ??
         source.description ??
         null
+
+      if (
+        source.store === 'epic' &&
+        !description
+      ) {
+        description =
+          'Available on the Epic Games Store.'
+      }
+
+      if (
+        source.store === 'epic' &&
+        metadata?.title &&
+        !source.title
+      ) {
+        db.prepare(`
+          UPDATE games
+          SET title = ?
+          WHERE id = ?
+        `).run(
+          metadata.title,
+          source.game_id
+        )
+      }
 
       let coverImage =
         metadata?.coverImage ??
@@ -143,9 +227,13 @@ async function refreshSteamMetadata({
       if (!coverImage) {
         try {
           const gridArtwork =
-            await getSteamGridArtwork(
-              source.store_game_id
-            )
+            source.store === 'epic'
+              ? await getSteamGridArtworkByName(
+                  source.title
+                )
+              : await getSteamGridArtwork(
+                  source.store_game_id
+                )
 
           if (gridArtwork?.coverImage) {
             coverImage =

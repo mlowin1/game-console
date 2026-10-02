@@ -35,3 +35,7 @@ dist-ssr
 # Local development Steam library
 dev-steam/
 dev-steam-drive2/
+
+.env
+.env.*
+!.env.example

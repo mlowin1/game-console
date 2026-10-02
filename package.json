@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "electron": "electron .",
-    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron\"",
+    "electron:dev": "concurrently -k \"npm run dev -- --port 5173 --strictPort\" \"wait-on http://localhost:5173 && npm run electron\"",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -15,8 +15,11 @@
   "dependencies": {
     "@node-steam/vdf": "^2.2.0",
     "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.5",
+    "lucide-react": "^1.50.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "simple-icons": "^16.33.0"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

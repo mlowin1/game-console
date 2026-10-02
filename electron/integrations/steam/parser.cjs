@@ -2,11 +2,26 @@ const fs = require('fs')
 const path = require('path')
 const VDF = require('@node-steam/vdf')
 
-function parseManifest(manifestPath) {
-  const contents = fs.readFileSync(manifestPath, 'utf8')
-  const parsed = VDF.parse(contents)
+function toNumber(value) {
+  const number = Number(value ?? 0)
 
-  const app = parsed.AppState
+  return Number.isFinite(number)
+    ? number
+    : 0
+}
+
+function parseManifest(manifestPath) {
+  const contents =
+    fs.readFileSync(
+      manifestPath,
+      'utf8'
+    )
+
+  const parsed =
+    VDF.parse(contents)
+
+  const app =
+    parsed.AppState
 
   if (!app) {
     throw new Error(
@@ -15,54 +30,132 @@ function parseManifest(manifestPath) {
   }
 
   return {
-    appId: String(app.appid),
-    name: app.name,
-    installDir: app.installdir,
-    stateFlags: Number(app.StateFlags ?? 0),
-    sizeOnDisk: Number(app.SizeOnDisk ?? 0),
+    appId:
+      String(app.appid),
+
+    name:
+      app.name,
+
+    installDir:
+      app.installdir,
+
+    stateFlags:
+      toNumber(
+        app.StateFlags
+      ),
+
+    sizeOnDisk:
+      toNumber(
+        app.SizeOnDisk
+      ),
+
+    /*
+     * Steam records these while an app
+     * is downloading/updating.
+     */
+    bytesToDownload:
+      toNumber(
+        app.BytesToDownload
+      ),
+
+    bytesDownloaded:
+      toNumber(
+        app.BytesDownloaded
+      ),
+
+    bytesToStage:
+      toNumber(
+        app.BytesToStage
+      ),
+
+    bytesStaged:
+      toNumber(
+        app.BytesStaged
+      ),
+
+    updateResult:
+      toNumber(
+        app.UpdateResult
+      ),
+
+    lastUpdated:
+      toNumber(
+        app.LastUpdated
+      ),
+
+    manifestPath,
   }
 }
 
-function findManifests(steamAppsPath) {
-  if (!fs.existsSync(steamAppsPath)) {
+function findManifests(
+  steamAppsPath
+) {
+  if (
+    !fs.existsSync(
+      steamAppsPath
+    )
+  ) {
     return []
   }
 
   return fs
-    .readdirSync(steamAppsPath)
+    .readdirSync(
+      steamAppsPath
+    )
     .filter((file) =>
-      /^appmanifest_\d+\.acf$/.test(file)
+      /^appmanifest_\d+\.acf$/.test(
+        file
+      )
     )
     .map((file) =>
-      path.join(steamAppsPath, file)
+      path.join(
+        steamAppsPath,
+        file
+      )
     )
 }
 
-function parseLibraryFolders(libraryFoldersPath) {
-  if (!fs.existsSync(libraryFoldersPath)) {
+function parseLibraryFolders(
+  libraryFoldersPath
+) {
+  if (
+    !fs.existsSync(
+      libraryFoldersPath
+    )
+  ) {
     return []
   }
 
-  const contents = fs.readFileSync(
-    libraryFoldersPath,
-    'utf8'
-  )
+  const contents =
+    fs.readFileSync(
+      libraryFoldersPath,
+      'utf8'
+    )
 
-  const parsed = VDF.parse(contents)
-  const folders = parsed.libraryfolders
+  const parsed =
+    VDF.parse(contents)
+
+  const folders =
+    parsed.libraryfolders
 
   if (!folders) {
     return []
   }
 
-  return Object.values(folders)
+  return Object.values(
+    folders
+  )
     .filter(
       (folder) =>
         folder &&
-        typeof folder === 'object' &&
+        typeof folder ===
+          'object' &&
         folder.path
     )
-    .map((folder) => folder.path)
+    .map(
+      (folder) =>
+        folder.path
+    )
 }
 
 module.exports = {
