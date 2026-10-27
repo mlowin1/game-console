@@ -55,35 +55,35 @@ function launchGame(gameId, lifecycle = {}) {
           source.source_id
         )
 
-        const result =
-          launchSteam(source.launch_target)
+        return launchSteam(source.launch_target).then((result) => {
+          if (!result.success) {
+            const db = getDatabase()
 
-        if (!result.success) {
-          const db = getDatabase()
+            db.prepare(`
+              UPDATE game_sessions
+              SET
+                status = 'failed',
+                ended_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(sessionId)
 
-          db.prepare(`
-            UPDATE game_sessions
-            SET
-              status = 'failed',
-              ended_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `).run(sessionId)
+            lifecycle.onFailed?.()
+            return result
+          }
 
-          return result
-        }
+          monitorSteamSession({
+            sessionId,
+            appId: source.store_game_id,
+            onStarted: lifecycle.onStarted,
+            onExited: lifecycle.onExited,
+            onFailed: lifecycle.onFailed,
+          })
 
-        monitorSteamSession({
-          sessionId,
-          appId: source.store_game_id,
-          onStarted: lifecycle.onStarted,
-          onExited: lifecycle.onExited,
-          onFailed: lifecycle.onFailed,
+          return {
+            ...result,
+            sessionId,
+          }
         })
-
-        return {
-          ...result,
-          sessionId,
-        }
       }
 
       case 'epic': {

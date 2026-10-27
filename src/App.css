@@ -848,12 +848,17 @@ button {
 
 .hub-brand-mark {
   display: grid;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   place-items: center;
+  overflow: hidden;
   border-radius: 10px;
-  background: #e9f2fb;
-  color: #101a27;
+}
+
+.hub-brand-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .hub-nav,
@@ -1695,6 +1700,26 @@ button {
   background: #101d2b;
 }
 
+.download-task-list {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 28px;
+}
+
+.download-task-list .section-heading {
+  margin: 0 0 3px;
+}
+
+.download-task.failed {
+  border-color: rgba(242, 96, 89, .27);
+  background: linear-gradient(100deg, rgba(80, 33, 36, .38), #101923 55%);
+}
+
+.download-task.cancelled {
+  border-color: rgba(171, 184, 198, .14);
+  background: #101821;
+}
+
 .download-task-art {
   width: 51px;
   height: 66px;
@@ -1721,9 +1746,98 @@ button {
   font-size: 12px;
 }
 
+.download-task-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.download-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid rgba(90, 166, 233, .19);
+  border-radius: 5px;
+  background: rgba(37, 111, 177, .13);
+  color: #9ccfff;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.download-state.failed {
+  border-color: rgba(244, 111, 101, .23);
+  background: rgba(156, 47, 43, .15);
+  color: #ff9e94;
+}
+
+.download-state.cancelled {
+  border-color: rgba(169, 183, 197, .16);
+  background: rgba(149, 162, 177, .08);
+  color: #aab6c3;
+}
+
+.download-state.complete {
+  border-color: rgba(65, 202, 146, .2);
+  background: rgba(36, 142, 99, .12);
+  color: #78ddb4;
+}
+
 .download-task-main span {
   color: #8fa0b1;
   font-size: 10px;
+}
+
+.download-task-main .download-error-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #e69b94;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.download-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.download-action {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(117, 183, 238, .23);
+  border-radius: 6px;
+  background: #16283a;
+  color: #c6e3fb;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.download-action:hover {
+  border-color: rgba(117, 183, 238, .55);
+  background: #203b54;
+}
+
+.download-action.danger {
+  border-color: rgba(244, 111, 101, .24);
+  background: rgba(125, 42, 40, .22);
+  color: #ffaaa1;
+}
+
+.download-action.subtle {
+  border-color: rgba(190, 208, 226, .12);
+  background: transparent;
+  color: #a2b0be;
+}
+
+.steam-cancel-note {
+  color: #8b9aab;
+  font-size: 9px;
+  white-space: nowrap;
 }
 
 .download-progress {
@@ -1856,6 +1970,18 @@ button {
   font-size: 10px;
 }
 
+.service-info .service-sync-description {
+  display: -webkit-box;
+  max-width: 240px;
+  overflow: hidden;
+  color: #718195;
+  font-size: 9px;
+  line-height: 1.3;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .service-status {
   display: inline-flex;
   align-items: center;
@@ -1871,6 +1997,15 @@ button {
 
 .service-status.connected {
   color: #6fd7ad;
+}
+
+.service-status.attention {
+  color: #f1b66b;
+}
+
+.service-status.attention i {
+  background: #f1b66b;
+  box-shadow: 0 0 8px rgba(241, 182, 107, .3);
 }
 
 .service-status.connected i {
@@ -2453,5 +2588,303 @@ button {
   .settings-panel {
     padding-right: 11px;
     padding-left: 11px;
+  }
+
+  .download-task {
+    flex-wrap: wrap;
+  }
+
+  .download-task-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+.hub-details .game-hero-content {
+  display: flex;
+  align-items: flex-end;
+  gap: 26px;
+  max-width: none;
+}
+
+.game-hero-cover {
+  width: 150px;
+  flex: 0 0 150px;
+  aspect-ratio: 2 / 2.72;
+  overflow: hidden;
+  border: 1px solid rgba(210, 228, 245, .2);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #1c3046, #101923);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .5);
+}
+
+.game-hero-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.game-hero-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.game-hero-main .description {
+  display: -webkit-box;
+  margin: 12px 0 16px;
+  overflow: hidden;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.pill-logo {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.game-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  margin: 0;
+}
+
+.game-stats > div {
+  display: grid;
+  gap: 3px;
+}
+
+.game-stats dt {
+  color: #8b9bad;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.game-stats dd {
+  margin: 0;
+  color: #f1f5fa;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.hub-details .details-actions .change-artwork-button {
+  margin-left: auto;
+}
+
+.details-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.details-card {
+  padding: 18px 20px;
+  border: 1px solid var(--hub-line);
+  border-radius: 9px;
+  background: #0e1721;
+}
+
+.details-card h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.details-card h3 {
+  margin: 20px 0 9px;
+  color: #8b9bad;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.about-card > p {
+  margin: 0;
+  color: #bccad8;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.owned-list {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.owned-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--hub-line);
+  font-size: 12px;
+}
+
+.owned-list li:last-child {
+  border-bottom: 0;
+}
+
+.owned-list li span {
+  margin-left: auto;
+  color: #8b9bad;
+  font-size: 11px;
+}
+
+.owned-logo {
+  width: 17px;
+  height: 17px;
+  fill: #d8eafa;
+}
+
+.install-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hub-line);
+  color: #8b9bad;
+}
+
+.install-status.ready {
+  color: var(--hub-green);
+}
+
+.install-status div {
+  display: grid;
+  gap: 3px;
+}
+
+.install-status strong {
+  color: #f1f5fa;
+  font-size: 14px;
+}
+
+.install-status span {
+  font-size: 11px;
+}
+
+.install-details {
+  display: grid;
+  gap: 13px;
+  margin: 16px 0 0;
+}
+
+.install-details > div {
+  display: grid;
+  gap: 3px;
+}
+
+.install-details dt {
+  color: #8b9bad;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.install-details dd {
+  margin: 0;
+  color: #e4edf5;
+  font-size: 12px;
+}
+
+.install-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-stores-heading {
+  margin-top: 26px;
+}
+
+.game-compat-badge {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid rgba(241, 182, 107, .55);
+  border-radius: 6px;
+  background: rgba(44, 28, 10, .9);
+  color: #f1b66b;
+}
+
+.compat-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(241, 182, 107, .3);
+  border-radius: 9px;
+  background: rgba(70, 45, 12, .28);
+  color: #f1b66b;
+}
+
+.compat-notice > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.compat-notice div {
+  display: grid;
+  gap: 4px;
+}
+
+.compat-notice strong {
+  color: #f6d9aa;
+  font-size: 13px;
+}
+
+.compat-notice p {
+  margin: 0;
+  color: #dcc7a4;
+  font-size: 12px;
+}
+
+.compat-notice small {
+  color: #a99572;
+  font-size: 10px;
+}
+
+.service-card.upcoming .service-logo {
+  color: #8696a8;
+}
+
+.store-initial {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid rgba(190, 215, 240, .25);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .details-body {
+    grid-template-columns: 1fr;
+  }
+
+  .hub-details .game-hero-content {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .game-hero-cover {
+    width: 110px;
+    flex-basis: auto;
   }
 }

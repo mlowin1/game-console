@@ -380,10 +380,14 @@ function startOperation(appId, action) {
   child.on('close', (code) => {
     operation.finished = true
     operation.exitCode = code
-    operation.error = code === 0
-      ? null
-      : operation.output.trim() || `Legendary exited with code ${code}`
-    operation.progress = code === 0 ? 100 : operation.progress
+    operation.error = operation.cancelled
+      ? 'Cancelled by user'
+      : code === 0
+        ? null
+        : operation.output.trim() || `Legendary exited with code ${code}`
+    operation.progress = code === 0 && !operation.cancelled
+      ? 100
+      : operation.progress
     installedCache.expiresAt = 0
   })
 
@@ -397,6 +401,25 @@ function startOperation(appId, action) {
 
 function getOperation(appId) {
   return operations.get(operationKey(appId)) || null
+}
+
+function cancelOperation(appId) {
+  const operation = getOperation(appId)
+
+  if (!operation || operation.finished) {
+    return {
+      success: false,
+      error: 'No active Epic operation exists for this game',
+    }
+  }
+
+  operation.cancelled = true
+  operation.child.kill('SIGTERM')
+
+  return {
+    success: true,
+    appId: operation.appId,
+  }
 }
 
 async function getConnectionStatus() {
@@ -590,6 +613,7 @@ function launchGame(appId, lifecycle = {}, installPath = null) {
 module.exports = {
   getConnectionStatus,
   getOperation,
+  cancelOperation,
   listInstalledGames,
   listOwnedGames,
   launchGame,

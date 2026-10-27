@@ -17,7 +17,7 @@ function launchSteam(launchTarget) {
 
   console.log(`Launching Steam target: ${launchTarget}`)
 
-  try {
+  return new Promise((resolve) => {
     const child = spawn(
       'steam',
       [launchTarget],
@@ -27,20 +27,37 @@ function launchSteam(launchTarget) {
       }
     )
 
-    child.unref()
+    let settled = false
+    const finish = (result) => {
+      if (settled) return
+      settled = true
+      resolve(result)
+    }
 
-    return {
-      success: true,
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Failed to launch Steam game',
-    }
-  }
+    child.once('spawn', () => {
+      child.unref()
+      finish({
+        success: true,
+        pid: child.pid,
+      })
+    })
+
+    child.once('error', (error) => {
+      finish({
+        success: false,
+        error: error.message,
+      })
+    })
+
+    child.once('close', (code) => {
+      if (!settled && code !== 0) {
+        finish({
+          success: false,
+          error: `Steam exited with code ${code}`,
+        })
+      }
+    })
+  })
 }
 
 module.exports = {

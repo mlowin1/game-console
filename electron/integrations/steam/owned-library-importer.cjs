@@ -23,9 +23,12 @@ function importOwnedSteamGames(ownedGames) {
       if (source) {
         db.prepare(`
           UPDATE game_sources
-          SET owned = 1
+          SET owned = 1, playtime_minutes = ?
           WHERE id = ?
-        `).run(source.source_id)
+        `).run(
+          steamGame.playtimeMinutes ?? 0,
+          source.source_id
+        )
 
         updated += 1
         continue
@@ -74,6 +77,12 @@ function importOwnedSteamGames(ownedGames) {
 
       const sourceId =
         Number(sourceResult.lastInsertRowid)
+
+      db.prepare(`
+        UPDATE game_sources
+        SET playtime_minutes = ?
+        WHERE id = ?
+      `).run(steamGame.playtimeMinutes ?? 0, sourceId)
 
       /*
        * Ownership does NOT imply installation.

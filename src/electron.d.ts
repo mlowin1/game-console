@@ -18,6 +18,8 @@ declare global {
     | 'uninstalling'
     | 'installed'
     | 'unknown'
+    | 'failed'
+    | 'cancelled'
 
   interface Game {
     id: number
@@ -27,6 +29,8 @@ declare global {
     hero_image: string | null
     stores: string
     last_played_at: string | null
+    compat_verdict: 'ok' | 'blocked' | 'unknown' | null
+    compat_reason: string | null
     installed: number
   }
 
@@ -48,6 +52,15 @@ declare global {
     cover_image: string | null
     hero_image: string | null
     sources: GameSource[]
+    session_count: number
+    last_played_at: string | null
+    total_play_seconds: number
+    compatibility: {
+      verdict: 'ok' | 'blocked' | 'unknown'
+      reason: string | null
+      source: string | null
+      reference_url: string | null
+    } | null
   }
 
   interface GameInstallStatus {
@@ -74,6 +87,19 @@ declare global {
     libraryPath?: string
     manifestPath?: string
     error?: string
+  }
+
+  interface DownloadTask {
+    game_id: number
+    title: string
+    cover_image: string | null
+    store: string
+    store_game_id: string
+    state: InstallState
+    progress: number
+    downloadedBytes: number
+    totalBytes: number
+    error?: string | null
   }
 
   interface ArtworkOption {
@@ -110,6 +136,17 @@ declare global {
     connected: boolean
     foundGames: number
     error: string | null
+  }
+
+  interface ProviderSyncStatus {
+    store: 'steam' | 'epic'
+    syncState: 'never' | 'connected' | 'error'
+    lastAttemptAt: string | null
+    lastSuccessAt: string | null
+    gameCount: number
+    error: string | null
+    configured: boolean
+    connected: boolean
   }
 
   interface Window {
@@ -172,6 +209,8 @@ declare global {
           | 'uninstalling'
           | 'installed'
           | 'unknown'
+          | 'failed'
+          | 'cancelled'
         progress: number
         appId?: string
         name?: string
@@ -181,6 +220,15 @@ declare global {
         error?: string
       }>
 
+      getDownloadTasks: () => Promise<DownloadTask[]>
+
+      cancelGameInstall: (gameId: number) => Promise<{
+        success: boolean
+        error?: string
+      }>
+
+      dismissDownloadTask: (gameId: number) => Promise<boolean>
+
       syncSteam: () =>
         Promise<SteamSyncResult>
 
@@ -189,6 +237,12 @@ declare global {
 
       getEpicConnectionStatus: () =>
         Promise<EpicConnectionStatus>
+
+      getProviderSyncStatus: () =>
+        Promise<{
+          steam: ProviderSyncStatus
+          epic: ProviderSyncStatus
+        }>
 
       getGameRuntimeStatus: (
         gameId: number
@@ -202,6 +256,8 @@ declare global {
           sessionId: number | null
           startedAt?: string
         }>
+
+      onLibraryChanged: (callback: () => void) => () => void
 
       onControllerCommand: (
         callback: (

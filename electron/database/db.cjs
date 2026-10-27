@@ -77,6 +77,7 @@ function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       game_source_id INTEGER NOT NULL,
       install_state TEXT NOT NULL DEFAULT 'not_installed',
+      install_error TEXT,
       install_path TEXT,
       launch_method TEXT,
       launch_target TEXT,
@@ -98,6 +99,27 @@ function initializeDatabase() {
       FOREIGN KEY (source_id)
         REFERENCES game_sources(id)
         ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS provider_syncs (
+      store TEXT PRIMARY KEY,
+      sync_state TEXT NOT NULL DEFAULT 'never',
+      last_attempt_at TEXT,
+      last_success_at TEXT,
+      game_count INTEGER NOT NULL DEFAULT 0,
+      error TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS game_compatibility (
+      game_id INTEGER PRIMARY KEY,
+      verdict TEXT NOT NULL,
+      reason TEXT,
+      source TEXT,
+      reference_url TEXT,
+      checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (game_id)
+        REFERENCES games(id)
+        ON DELETE CASCADE
     );
   `)
 
@@ -195,6 +217,34 @@ function initializeDatabase() {
           'Database migration: added games.cover_override'
         )
       }
+
+    const installationColumns = db.prepare(`
+      PRAGMA table_info(installations)
+    `).all()
+    const installationColumnNames = new Set(
+      installationColumns.map((column) => column.name)
+    )
+
+    const sourceColumnNames = new Set(
+      db.prepare('PRAGMA table_info(game_sources)').all()
+        .map((column) => column.name)
+    )
+
+    if (!sourceColumnNames.has('playtime_minutes')) {
+      db.exec(`
+        ALTER TABLE game_sources
+        ADD COLUMN playtime_minutes INTEGER NOT NULL DEFAULT 0
+      `)
+      console.log('Database migration: added game_sources.playtime_minutes')
+    }
+
+    if (!installationColumnNames.has('install_error')) {
+      db.exec(`
+        ALTER TABLE installations
+        ADD COLUMN install_error TEXT
+      `)
+      console.log('Database migration: added installations.install_error')
+    }
 
   return db
 }

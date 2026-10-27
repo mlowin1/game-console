@@ -15,6 +15,15 @@ contextBridge.exposeInMainWorld('launcher', {
       gameId
     ),
 
+  getDownloadTasks: () =>
+    ipcRenderer.invoke('games:download-tasks'),
+
+  cancelGameInstall: (gameId) =>
+    ipcRenderer.invoke('games:cancel-install', gameId),
+
+  dismissDownloadTask: (gameId) =>
+    ipcRenderer.invoke('games:dismiss-download', gameId),
+
   getArtworkOptions: (gameId) =>
     ipcRenderer.invoke(
       'games:getArtworkOptions',
@@ -66,6 +75,19 @@ contextBridge.exposeInMainWorld('launcher', {
 
   getEpicConnectionStatus: () =>
     ipcRenderer.invoke('epic:status'),
+
+  getProviderSyncStatus: () =>
+    ipcRenderer.invoke('providers:status'),
+
+  onLibraryChanged: (callback) => {
+    const listener = () => callback()
+
+    ipcRenderer.on('library:changed', listener)
+
+    return () => {
+      ipcRenderer.removeListener('library:changed', listener)
+    }
+  },
 
   getGameRuntimeStatus: (gameId) =>
     ipcRenderer.invoke(

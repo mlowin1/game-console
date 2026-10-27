@@ -36,6 +36,13 @@ const {
 const {
   importOwnedSteamGames,
 } = require('./integrations/steam/owned-library-importer.cjs')
+const {
+  getProviderSyncStatus,
+  recordProviderSync,
+} = require('./services/provider-sync-service.cjs')
+const {
+  refreshCompatibility,
+} = require('./services/compatibility-service.cjs')
 
 const {
   getSteamGridArtworkOptions,
@@ -46,11 +53,32 @@ const {
   installGame,
   uninstallGame,
   getGameInstallStatus,
+  getDownloadTasks,
+  cancelGameInstall,
+  dismissDownloadTask,
 } = require(
   './services/game-install-service.cjs'
 )
 
 let mainWindow = null
+
+function refreshCompatibilityInBackground() {
+  refreshCompatibility()
+    .then((result) => {
+      if (result.checked === 0) return
+
+      console.log(
+        `Compatibility check: ${result.checked} checked, ${result.blocked} flagged, ${result.failed} failed`
+      )
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('library:changed')
+      }
+    })
+    .catch((error) => {
+      console.warn('Compatibility check failed:', error.message)
+    })
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -150,10 +178,19 @@ app.whenReady().then(async () => {
     const ownedResult =
       importOwnedSteamGames(ownedGames)
 
+    recordProviderSync('steam', {
+      success: true,
+      gameCount: ownedResult.total,
+    })
+
     console.log(
       `Steam owned library sync: ${ownedResult.total} total, ${ownedResult.added} added, ${ownedResult.updated} updated`
     )
   } catch (error) {
+    recordProviderSync('steam', {
+      success: false,
+      error: error.message,
+    })
     console.error(
       'Steam owned library sync failed:',
       error
@@ -360,17 +397,48 @@ app.whenReady().then(async () => {
       }
     )
 
+    ipcMain.handle('games:download-tasks', async () =>
+      getDownloadTasks()
+    )
+
+    ipcMain.handle('games:cancel-install', (_event, gameId) => {
+      if (!Number.isInteger(gameId)) {
+        throw new Error('Invalid game ID')
+      }
+
+      return cancelGameInstall(gameId)
+    })
+
+    ipcMain.handle('games:dismiss-download', (_event, gameId) => {
+      if (!Number.isInteger(gameId)) {
+        throw new Error('Invalid game ID')
+      }
+
+      return dismissDownloadTask(gameId)
+    })
+
     ipcMain.handle('steam:sync', async () => {
       try {
+        const ownedGames = await getOwnedSteamGames()
+        const ownedResult = importOwnedSteamGames(ownedGames)
         const steamResult = syncSteam()
-        const epicResult = await syncEpic()
+        recordProviderSync('steam', {
+          success: true,
+          gameCount: ownedResult.total,
+        })
+
+        refreshCompatibilityInBackground()
 
         return {
           success: true,
           ...steamResult,
-          epic: epicResult,
+          account: ownedResult,
         }
       } catch (error) {
+        recordProviderSync('steam', {
+          success: false,
+          error: error.message,
+        })
         console.error('Manual Steam sync failed:', error)
 
         return {
@@ -385,6 +453,10 @@ app.whenReady().then(async () => {
     ipcMain.handle('epic:sync', async () => {
       try {
         const epicResult = await syncEpic()
+        recordProviderSync('epic', {
+          success: true,
+          gameCount: epicResult.found,
+        })
         let metadataResult = null
 
         try {
@@ -396,12 +468,18 @@ app.whenReady().then(async () => {
           console.warn('Epic metadata refresh failed:', error.message)
         }
 
+        refreshCompatibilityInBackground()
+
         return {
           success: true,
           ...epicResult,
           metadata: metadataResult,
         }
       } catch (error) {
+        recordProviderSync('epic', {
+          success: false,
+          error: error.message,
+        })
         console.error('Manual Epic sync failed:', error)
 
         return {
@@ -415,6 +493,27 @@ app.whenReady().then(async () => {
 
     ipcMain.handle('epic:status', async () => {
       return await getEpicConnectionStatus()
+    })
+
+    ipcMain.handle('providers:status', async () => {
+      const syncStatus = getProviderSyncStatus()
+      const epicConnection = await getEpicConnectionStatus()
+
+      return {
+        steam: {
+          ...syncStatus.steam,
+          configured: Boolean(
+            process.env.STEAM_WEB_API_KEY && process.env.STEAM_ID
+          ),
+          connected: Boolean(syncStatus.steam.lastSuccessAt),
+        },
+        epic: {
+          ...syncStatus.epic,
+          configured: epicConnection.available,
+          connected: epicConnection.connected,
+          error: epicConnection.error ?? syncStatus.epic.error,
+        },
+      }
     })
 
     ipcMain.handle('launcher:show', () => {
@@ -441,6 +540,7 @@ app.whenReady().then(async () => {
     )
 
   createWindow()
+  refreshCompatibilityInBackground()
 
 function restoreLauncherWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {
